@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Snake.io Prototype</title>
+  <style>
+    canvas {
+      background: #111;
+      display: block;
+      margin: 0 auto;
+      border: 2px solid #fff;
+    }
+  </style>
+</head>
+<body>
+<canvas id="game" width="800" height="600"></canvas>
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+const gridSize = 20;
+const cols = canvas.width / gridSize;
+const rows = canvas.height / gridSize;
+
+const food = [];
+function spawnFood() {
+  food.push({
+    x: Math.floor(Math.random() * cols),
+    y: Math.floor(Math.random() * rows)
+  });
+}
+
+for (let i = 0; i < 10; i++) spawnFood();
+
+let gameTick = 0;
+let snakesEaten = 0;
+let winDisplayed = false;
+
+class Snake {
+  constructor(id, isPlayer = false) {
+    this.id = id;
+    this.body = [
+      { x: Math.floor(Math.random() * cols), y: Math.floor(Math.random() * rows) }
+    ];
+    this.dir = { x: 1, y: 0 };
+    this.isPlayer = isPlayer;
+    this.color = isPlayer ? 'lime' : 'cyan';
+    this.alive = true;
+    this.tickOffset = Math.floor(Math.random() * 10);
+  }
+
+  changeDir(newDir) {
+    this.dir = newDir;
+  }
+
+  move() {
+    if ((gameTick + this.tickOffset) % 12 !== 0) return; // slower movement
+    const head = this.body[0];
+    const newHead = {
+      x: (head.x + this.dir.x + cols) % cols,
+      y: (head.y + this.dir.y + rows) % rows
+    };
+
+    // Check for collisions with other snakes
+    for (let other of snakes) {
+      if (!other.alive || other === this) continue;
+      for (let i = this.isPlayer ? 1 : 0; i < other.body.length; i++) {
+        if (newHead.x === other.body[i].x && newHead.y === other.body[i].y) {
+          if (this.isPlayer) {
+            // Eat the other snake
+            other.alive = false;
+            snakesEaten++;
+            for (let j = 0; j < other.body.length; j++) {
+              this.body.push({ ...this.body[this.body.length - 1] });
+            }
+          }
+          return;
+        }
+      }
+    }
+
+    this.body.unshift(newHead);
+
+    // Check for food
+    const eaten = food.findIndex(f => f.x === newHead.x && f.y === newHead.y);
+    if (eaten !== -1) {
+      food.splice(eaten, 1);
+      spawnFood();
+    } else {
+      this.body.pop();
+    }
+  }
+
+  autoMove() {
+    if (Math.random() < 0.01) {
+      const dirs = [
+        { x: 1, y: 0 },
+        { x: -1, y: 0 },
+        { x: 0, y: 1 },
+        { x: 0, y: -1 }
+      ];
+      this.dir = dirs[Math.floor(Math.random() * dirs.length)];
+    }
+  }
+
+  draw() {
+    if (!this.alive) return;
+    ctx.fillStyle = this.color;
+    for (let i = 0; i < this.body.length; i++) {
+      ctx.fillRect(this.body[i].x * gridSize, this.body[i].y * gridSize, gridSize, gridSize);
+      ctx.fillStyle = 'white';
+      ctx.font = '12px Arial';
+      ctx.fillText(this.id, this.body[i].x * gridSize + 4, this.body[i].y * gridSize + 14);
+      ctx.fillStyle = this.color;
+    }
+  }
+}
+
+const snakes = [new Snake(1, true)];
+for (let i = 2; i <= 10; i++) {
+  snakes.push(new Snake(i));
+}
+
+const keys = {
+  ArrowUp:    { x: 0, y: -1 },
+  ArrowDown:  { x: 0, y: 1 },
+  ArrowLeft:  { x: -1, y: 0 },
+  ArrowRight: { x: 1, y: 0 }
+};
+
+document.addEventListener('keydown', e => {
+  if (keys[e.key]) {
+    snakes[0].changeDir(keys[e.key]);
+  }
+});
+
+function drawWinMessage() {
+  ctx.fillStyle = 'white';
+  ctx.font = '40px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('GEFELICITEERD JE HEBT ALLE STAPPEN GEPAKT!', canvas.width / 2, canvas.height / 2);
+
+  // Pop-up message 
+  setTimeout(() =>  {
+   alert('Gefeliciteerd je hebt alle stappen te pakken!');
+  }, 100);
+}
+
+function gameLoop() {
+  gameTick++;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Draw food
+  ctx.fillStyle = 'red';
+  for (let f of food) {
+    ctx.fillRect(f.x * gridSize, f.y * gridSize, gridSize, gridSize);
+  }
+
+  // Update and draw snakes
+  for (let snake of snakes) {
+    if (!snake.alive) continue;
+    if (!snake.isPlayer) snake.autoMove();
+    snake.move();
+    snake.draw();
+  }
+
+  // Check for win condition
+  if (snakesEaten >= 9 && !winDisplayed) {
+    winDisplayed = true;
+    drawWinMessage();
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
